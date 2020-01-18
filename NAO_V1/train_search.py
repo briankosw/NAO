@@ -109,9 +109,12 @@ def get_builder(dataset):
     
 
 def build_cifar10(model_state_dict=None, optimizer_state_dict=None, **kwargs):
+    # pop epoch and ratio from kwargs
     epoch = kwargs.pop('epoch')
     ratio = kwargs.pop('ratio')
+    # standard data transformation to CIFAR10 data
     train_transform, valid_transform = utils._data_transforms_cifar10(args.child_cutout_size)
+    # create train and validation datasets
     train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
     valid_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=valid_transform)
     
@@ -120,7 +123,7 @@ def build_cifar10(model_state_dict=None, optimizer_state_dict=None, **kwargs):
     indices = list(range(num_train)) 
     split = int(np.floor(ratio * num_train))
     np.random.shuffle(indices)
-
+    # create data loader for train and validation
     train_queue = torch.utils.data.DataLoader(
         train_data, batch_size=args.child_batch_size,
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[:split]),
@@ -129,25 +132,30 @@ def build_cifar10(model_state_dict=None, optimizer_state_dict=None, **kwargs):
         valid_data, batch_size=args.child_eval_batch_size,
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:num_train]),
         pin_memory=True, num_workers=16)
-    
+    # create model
     model = NASWSNetworkCIFAR(10, args.child_layers, args.child_nodes, args.child_channels, args.child_keep_prob, args.child_drop_path_keep_prob,
                        args.child_use_aux_head, args.steps)
+    # move model to GPU
     model = model.cuda()
+    # create and move training loss to GPU
     train_criterion = nn.CrossEntropyLoss().cuda()
     eval_criterion = nn.CrossEntropyLoss().cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
-
+    # create optimizer
     optimizer = torch.optim.SGD(
         model.parameters(),
         args.child_lr_max,
         momentum=0.9,
         weight_decay=args.child_l2_reg,
     )
+    # load previous model and optimizer states if they exist
     if model_state_dict is not None:
         model.load_state_dict(model_state_dict)
     if optimizer_state_dict is not None:
         optimizer.load_state_dict(optimizer_state_dict)
+    # create Cosine Annealing LR scheduler
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.child_epochs, args.child_lr_min, epoch)
+
     return train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler
 
 
@@ -618,10 +626,12 @@ def nao_infer(queue, model, step, direction='+'):
 
 
 def main():
+    # Make sure CUDA is available
     if not torch.cuda.is_available():
         logging.info('no gpu device available')
         sys.exit(1)
-        
+    
+    # Setting random seeds
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -649,11 +659,11 @@ def main():
             child_arch_pool = archs
     else:
         child_arch_pool = None
-
+    # create 
     child_eval_epochs = eval(args.child_eval_epochs)
     build_fn = get_builder(args.dataset)
     train_queue, valid_queue, model, train_criterion, eval_criterion, optimizer, scheduler = build_fn(ratio=0.9, epoch=-1)
-
+    # create NAO
     nao = NAO(
         args.controller_encoder_layers,
         args.controller_encoder_vocab_size,

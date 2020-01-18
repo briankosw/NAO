@@ -92,6 +92,19 @@ class Node(nn.Module):
 
 
 class Cell(nn.Module):
+    """
+        Cell class
+
+        Arguments:
+            prev_layers:
+            nodes: number of nodes in Cell
+            channels: number of channels in Cell
+            reduction: boolean that indicates if Cell is of type reduction
+            layer_id: layer id of Cell
+            layers: number of total layers in child network
+            steps: 
+            drop_path_keep_prob: 
+    """
     def __init__(self, prev_layers, nodes, channels, reduction, layer_id, layers, steps, drop_path_keep_prob=None):
         super(Cell, self).__init__()
         assert len(prev_layers) == 2
@@ -124,6 +137,14 @@ class Cell(nn.Module):
         self.out_shape = [out_hw, out_hw, channels]
         
     def forward(self, s0, s1, arch, step, bn_train=False):
+        """
+            Arguments:
+                s0:
+                s1:
+                arch:
+                step:
+                bn_train:
+        """
         s0, s1 = self.maybe_calibrate_size(s0, s1, bn_train=bn_train)
         states = [s0, s1]
         used = [0] * (self.nodes + 2)
@@ -150,19 +171,32 @@ class Cell(nn.Module):
     
 
 class NASWSNetworkCIFAR(nn.Module):
+    """
+        Weight-Sharing Network for CIFAR
+
+        Arguments:
+            classes: integer for # of classes (10 or 100)
+            layers: number of layers for child network
+            nodes: number of nodes per layer for child network
+            channels: number of channels per node for child network
+            keep_prob: keep_prob for child network
+            drop_path_keep_prob: 
+            use_aux_head: boolean for using auxiliary head
+            steps: 
+    """
     def __init__(self, classes, layers, nodes, channels, keep_prob, drop_path_keep_prob, use_aux_head, steps):
         super(NASWSNetworkCIFAR, self).__init__()
-        self.classes = classes
-        self.layers = layers
-        self.nodes = nodes
-        self.channels = channels
-        self.keep_prob = keep_prob
-        self.drop_path_keep_prob = drop_path_keep_prob
-        self.use_aux_head = use_aux_head
-        self.steps = steps
+        self.classes = classes # 10
+        self.layers = layers # default = 3
+        self.nodes = nodes # default = 5
+        self.channels = channels # default = 20
+        self.keep_prob = keep_prob # default = 1.0
+        self.drop_path_keep_prob = drop_path_keep_prob # default = 0.9
+        self.use_aux_head = use_aux_head # default = False
+        self.steps = steps # 
 
-        self.pool_layers = [self.layers, 2 * self.layers + 1]
-        self.total_layers = self.layers * 3 + 2
+        self.pool_layers = [self.layers, 2 * self.layers + 1] # [3, 7]
+        self.total_layers = self.layers * 3 + 2 # 11
        
         if self.use_aux_head:
             self.aux_head_index = self.pool_layers[-1]
@@ -174,6 +208,7 @@ class NASWSNetworkCIFAR(nn.Module):
         )
         outs = [[32, 32, channels], [32, 32, channels]]
         channels = self.channels
+        
         self.cells = nn.ModuleList()
         for i in range(self.total_layers):
             # normal cell
@@ -209,6 +244,13 @@ class NASWSNetworkCIFAR(nn.Module):
         return model_new
     
     def forward(self, input, arch, step=None, bn_train=False):
+        """
+            Arguments:
+                input:
+                arch:
+                step:
+                bn_train:
+        """
         aux_logits = None
         conv_arch, reduc_arch = arch
         s0 = s1 = self.stem(input)
