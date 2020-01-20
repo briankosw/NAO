@@ -88,21 +88,25 @@ class Decoder(nn.Module):
         predicted_softmax = F.log_softmax(self.out(output.contiguous().view(-1, self.hidden_size)), dim=1)
         predicted_softmax = predicted_softmax.view(batch_size, output_size, -1)
         return predicted_softmax, hidden, attn
-    
+
     def forward(self, x, encoder_hidden=None, encoder_outputs=None):
+        # create dictionary of return values
         ret_dict = dict()
+        # create list for attention scores
         ret_dict[Decoder.KEY_ATTN_SCORE] = list()
+        # set inference = (x == None)
         if x is None:
             inference = True
         else:
             inference = False
+        # validate argument #TODO
         x, batch_size, length = self._validate_args(x, encoder_hidden, encoder_outputs)
         assert length == self.length
         decoder_hidden = self._init_state(encoder_hidden)
         decoder_outputs = []
         sequence_symbols = []
         lengths = np.array([length] * batch_size)
-        
+
         def decode(step, step_output, step_attn):
             decoder_outputs.append(step_output)
             ret_dict[Decoder.KEY_ATTN_SCORE].append(step_attn)

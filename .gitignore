@@ -102,3 +102,6 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# vscode
+./NAO_V1/.vscode/*
